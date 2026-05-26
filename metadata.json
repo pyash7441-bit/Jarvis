@@ -1,0 +1,6 @@
+{
+  "name": "JARVIS Ultra",
+  "description": "Tony Stark inspired AI HUD assistant featuring responsive panels, voice system, alarms, offline Q&As, tracking tools, and custom visual rings.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
