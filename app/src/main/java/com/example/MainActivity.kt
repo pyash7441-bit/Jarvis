@@ -104,14 +104,20 @@ class MainActivity : ComponentActivity() {
         ttsManager = TtsManager(
             context = this,
             onInitCompleted = {
-                // Speak greeting on launch
-                speakWittyGreeting()
+                runOnUiThread {
+                    // Speak greeting on launch
+                    speakWittyGreeting()
+                }
             },
             onSpeechStarted = {
-                currentOrbState = OrbState.SPEAKING
+                runOnUiThread {
+                    currentOrbState = OrbState.SPEAKING
+                }
             },
             onSpeechFinished = {
-                currentOrbState = OrbState.IDLE
+                runOnUiThread {
+                    currentOrbState = OrbState.IDLE
+                }
             }
         )
 
@@ -197,32 +203,38 @@ class MainActivity : ComponentActivity() {
                 speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
                     setRecognitionListener(object : RecognitionListener {
                         override fun onReadyForSpeech(params: Bundle?) {
-                            currentOrbState = OrbState.LISTENING
+                            runOnUiThread {
+                                currentOrbState = OrbState.LISTENING
+                            }
                         }
                         override fun onBeginningOfSpeech() {}
                         override fun onRmsChanged(rmsdB: Float) {}
                         override fun onBufferReceived(buffer: ByteArray?) {}
                         override fun onEndOfSpeech() {}
                         override fun onError(error: Int) {
-                            currentOrbState = OrbState.IDLE
-                            val desc = when (error) {
-                                SpeechRecognizer.ERROR_NO_MATCH -> "No speech matching caught, sir."
-                                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Permission denied: Microphone access locked."
-                                SpeechRecognizer.ERROR_NETWORK_TIMEOUT, SpeechRecognizer.ERROR_NETWORK -> "Sensor network timeout, sir."
-                                else -> "Relay anomaly: code $error"
+                            runOnUiThread {
+                                currentOrbState = OrbState.IDLE
+                                val desc = when (error) {
+                                    SpeechRecognizer.ERROR_NO_MATCH -> "No speech matching caught, sir."
+                                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Permission denied: Microphone access locked."
+                                    SpeechRecognizer.ERROR_NETWORK_TIMEOUT, SpeechRecognizer.ERROR_NETWORK -> "Sensor network timeout, sir."
+                                    else -> "Relay anomaly: code $error"
+                                }
+                                chatMessages.add(ChatMessage(text = desc, sender = "ERROR"))
+                                ttsManager?.speak(desc, currentLang)
                             }
-                            chatMessages.add(ChatMessage(text = desc, sender = "ERROR"))
-                            ttsManager?.speak(desc, currentLang)
                         }
 
                         override fun onResults(results: Bundle?) {
-                            val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                            if (!matches.isNullOrEmpty()) {
-                                val speechText = matches[0]
-                                chatMessages.add(ChatMessage(text = speechText, sender = "USER"))
-                                processUserStatement(speechText)
-                            } else {
-                                currentOrbState = OrbState.IDLE
+                            runOnUiThread {
+                                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                                if (!matches.isNullOrEmpty()) {
+                                    val speechText = matches[0]
+                                    chatMessages.add(ChatMessage(text = speechText, sender = "USER"))
+                                    processUserStatement(speechText)
+                                } else {
+                                    currentOrbState = OrbState.IDLE
+                                }
                             }
                         }
 
@@ -2780,7 +2792,15 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        ttsManager?.shutdown()
-        speechRecognizer?.destroy()
+        try {
+            ttsManager?.shutdown()
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error shutting down tts", e)
+        }
+        try {
+            speechRecognizer?.destroy()
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error destroying speechRecognizer", e)
+        }
     }
 }

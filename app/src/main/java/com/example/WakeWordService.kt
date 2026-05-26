@@ -37,14 +37,28 @@ class WakeWordService : Service() {
         super.onCreate()
         Log.d("WakeWordService", "WakeWordService Created.")
         createNotificationChannel()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIFICATION_ID,
-                getNotification(),
-                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, getNotification())
+        
+        val hasMicPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+            this, android.Manifest.permission.RECORD_AUDIO
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && hasMicPermission) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    getNotification(),
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, getNotification())
+            }
+        } catch (e: Exception) {
+            Log.e("WakeWordService", "Failed to start foreground service safely. Trying generic fallback...", e)
+            try {
+                startForeground(NOTIFICATION_ID, getNotification())
+            } catch (ex: Exception) {
+                Log.e("WakeWordService", "Failed to start foreground service even as fallback.", ex)
+            }
         }
         acquireWakeLock()
         
@@ -197,8 +211,16 @@ class WakeWordService : Service() {
 
     private fun stopListening() {
         isListening = false
-        speechRecognizer?.stopListening()
-        speechRecognizer?.destroy()
+        try {
+            speechRecognizer?.stopListening()
+        } catch (e: Exception) {
+            Log.e("WakeWordService", "Error stopping recognizer", e)
+        }
+        try {
+            speechRecognizer?.destroy()
+        } catch (e: Exception) {
+            Log.e("WakeWordService", "Error destroying recognizer", e)
+        }
         speechRecognizer = null
     }
 
